@@ -1,4 +1,12 @@
-# containerapp
+# Container App
+
+## Getting started
+
+```bash
+echo "creating environment"
+az deployment sub create -f .\main.bicep -l canadacentral -n azvoteapp
+```
+
 ## Done
 
 - Bicep IaC
@@ -16,6 +24,7 @@
 - vnet integration
 
 ## TODO / missing
+- Azure Vote sample app deployment
 - queue example
 - akv for secrets
 - roll back revision
