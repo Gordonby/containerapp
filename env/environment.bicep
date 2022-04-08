@@ -1,6 +1,6 @@
 targetScope = 'resourceGroup'
 
-param nameseed string = uniqueString(resourceGroup().id)
+param nameseed string = uniqueString(subscription().id)
 param location string = resourceGroup().location
 
 param UseVirtualNetwork bool = true

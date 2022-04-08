@@ -39,7 +39,8 @@ module app 'apps/azurevote/main.bicep' = {
   params: {
     location: location
     environmentName: env.outputs.environmentName
-    redisName: CreateManagedRedis ? redis.name : ''
+    managedRedisName: CreateManagedRedis ? redis.name : ''
     UseExternalRedis: CreateManagedRedis
+    version: '1.2'
   }
 }
