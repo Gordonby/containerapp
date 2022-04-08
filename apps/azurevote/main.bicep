@@ -1,10 +1,21 @@
 targetScope = 'resourceGroup'
 
-@description('The name of the environment that the app should be deployed to.')
+@description('The name of the container apps environment that the app should be deployed to.')
 param environmentName string
+
 param location string = resourceGroup().location
+
+@description('Azure vote frontend image tag')
 param frontEndImage string = 'mcr.microsoft.com/azuredocs/azure-vote-front:v1'
+
+@description('Azure vote backend image tag')
 param backEndImage string = 'mcr.microsoft.com/oss/bitnami/redis:6.0.8'
+
+@description('Have you created an Azure Redis Cache to use with the app?')
+param UseExternalRedis bool = false
+
+@description('Name of the Azure Redis Cache')
+param managedRedisName string = ''
 
 param version string = '1.0'
 param previous_version string = ''
@@ -18,13 +29,54 @@ resource environment 'Microsoft.App/managedEnvironments@2022-01-01-preview' exis
   name: environmentName
 }
 
+resource managedRedis 'Microsoft.Cache/redis@2020-12-01' existing = if(UseExternalRedis) {
+  name: managedRedisName
+}
+
 var appName='azure-vote'
 var appFe='${appName}-front'
 var appBe='${appName}-back'
+
+var frontendContainer = {
+  name: appFe
+  image: frontEndImage
+  env: [
+    {
+      name: 'REDIS'
+      value: UseExternalRedis ? managedRedis.properties.hostName : 'localhost'
+    }
+    {
+      name: 'REDIS_PWD'
+      value: UseExternalRedis ? managedRedis.listKeys().primaryKey : ''
+    }
+  ]
+  resources: {
+    cpu: json('.25')
+    memory: '.5Gi'
+  }
+}
+
+var backendContainer = {
+  name: appBe
+  image: backEndImage
+  env: [
+    {
+      name: 'ALLOW_EMPTY_PASSWORD'
+      value: 'yes'
+    }
+  ]
+  resources: {
+    cpu: json('.25')
+    memory: '.5Gi'
+  }
+}
+
+@description('Conditionally create Redis if an external Redis is not available')
+var containers = UseExternalRedis ? array(frontendContainer) : concat(array(frontendContainer), array(backendContainer))
+
 resource azureVote 'Microsoft.App/containerApps@2022-01-01-preview' = {
   name: 'azurevote-app'
   location: location
-
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
@@ -44,39 +96,9 @@ resource azureVote 'Microsoft.App/containerApps@2022-01-01-preview' = {
       ]
       }
     }
-
     template: {
       revisionSuffix: revisionSuffix
-      containers: [
-        {
-          name: appFe
-          image: frontEndImage
-          env: [
-            {
-              name: 'REDIS'
-              value: 'localhost'
-            }
-          ]
-          resources: {
-            cpu: json('.25')
-            memory: '.5Gi'
-          }
-        }
-        {
-          name: appBe
-          image: backEndImage
-          env: [
-            {
-              name: 'ALLOW_EMPTY_PASSWORD'
-              value: 'yes'
-            }
-          ]
-          resources: {
-            cpu: json('.25')
-            memory: '.5Gi'
-          }
-        }
-      ]
+      containers: containers
       scale: {
         minReplicas: 1
         maxReplicas: 5

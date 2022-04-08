@@ -1,10 +1,13 @@
 targetScope = 'resourceGroup'
 
-var suffix = uniqueString(resourceGroup().id)
+param nameseed string = uniqueString(resourceGroup().id)
 param location string = resourceGroup().location
 
-resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' = {
-  name: 'vnet'
+param UseVirtualNetwork bool = true
+
+param vnetName string = 'vnet-${nameseed}'
+resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' = if(UseVirtualNetwork) {
+  name: vnetName
   location: location
 
   properties: {
@@ -31,7 +34,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' = {
 }
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
-  name: 'logs${suffix}'
+  name: 'log-${nameseed}'
   location: location
 
   properties: {
@@ -41,17 +44,19 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2021-06-01' = {
     retentionInDays: 30
   }
 }
+output logResourceId string = logs.id
 
+param environemntName string = 'cenv-${nameseed}'
 resource environment 'Microsoft.App/managedEnvironments@2022-01-01-preview' = {
-  name: 'environment'
+  name: environemntName
   location: location
 
   properties: {
-    vnetConfiguration: {
+    vnetConfiguration: UseVirtualNetwork ? {
       internal: false
       infrastructureSubnetId: vnet.properties.subnets[0].id
       runtimeSubnetId: vnet.properties.subnets[1].id
-    }
+    } : {}
 
     appLogsConfiguration: {
       destination: 'log-analytics'
@@ -62,5 +67,6 @@ resource environment 'Microsoft.App/managedEnvironments@2022-01-01-preview' = {
     }
   }
 }
+output environmentName string = environment.name
 
 output environment_id string = environment.id
